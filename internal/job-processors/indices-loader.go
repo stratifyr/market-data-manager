@@ -16,21 +16,21 @@ import (
 
 type indicesLoader struct {
 	securityServiceClient client.SecurityServiceClient
-	indices               map[string]string
+	indices               []string
 }
 
 func NewIndicesLoader(securityServiceClient client.SecurityServiceClient) JobProcessor {
 	return &indicesLoader{
 		securityServiceClient: securityServiceClient,
-		indices: map[string]string{
-			"NIFTY 50":              "ind_nifty50list.csv",
-			"NIFTY NEXT 50":         "ind_niftynext50list.csv",
-			"NIFTY 100":             "ind_nifty100list.csv",
-			"NIFTY MIDCAP 150":      "ind_niftymidcap150list.csv",
-			"NIFTY LARGEMIDCAP 250": "ind_niftylargemidcap250list.csv",
-			"NIFTY SMALL CAP 250":   "ind_niftysmallcap250list.csv",
-			"NIFTY MIDSMALLCAP 400": "ind_niftymidsmallcap400list.csv",
-			"NIFTY 500":             "ind_nifty500list.csv",
+		indices: []string{
+			"NIFTY 50",
+			"NIFTY NEXT 50",
+			"NIFTY 100",
+			"NIFTY MIDCAP 150",
+			"NIFTY LARGEMIDCAP 250",
+			"NIFTY SMALL CAP 250",
+			"NIFTY MIDSMALLCAP 400",
+			"NIFTY 500",
 		},
 	}
 }
@@ -52,8 +52,8 @@ func (l *indicesLoader) Process(ctx *gofr.Context) (logs *Logs, err error) {
 
 	var symbols []string
 
-	for indexName, constituentsFile := range l.indices {
-		symbols, err = l.getIndexConstituents(ctx, constituentsFile)
+	for _, indexName := range l.indices {
+		symbols, err = l.getIndexConstituents(ctx, indexName)
 		if err != nil {
 			return logs, err
 		}
@@ -81,8 +81,9 @@ func (l *indicesLoader) Process(ctx *gofr.Context) (logs *Logs, err error) {
 	return logs, nil
 }
 
-func (l *indicesLoader) getIndexConstituents(ctx *gofr.Context, fileName string) ([]string, error) {
+func (l *indicesLoader) getIndexConstituents(ctx *gofr.Context, indexName string) ([]string, error) {
 	httpService := service.NewHTTPService("https://www.niftyindices.com", ctx.Logger, nil)
+	fileName := fmt.Sprintf("ind_%slist.csv", strings.ReplaceAll(strings.ToLower(indexName), " ", ""))
 	apiName := fmt.Sprintf("IndexConstituent/%s", fileName)
 
 	resp, err := httpService.GetWithHeaders(ctx, apiName, nil, map[string]string{"User-Agent": "Mozilla/5.0"})
