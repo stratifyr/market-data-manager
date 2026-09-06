@@ -63,7 +63,7 @@ func (l *indicesLoader) Process(ctx *gofr.Context) (logs *Logs, err error) {
 		for _, symbol := range symbols {
 			securityID, ok := securityIDBySymbol[symbol]
 			if !ok {
-				logs.Errors = append(logs.Errors, fmt.Sprintf("%s security id not found", symbol))
+				logs.Errors = append(logs.Errors, fmt.Sprintf("%s %s security id not found", indexName, symbol))
 				continue
 			}
 
