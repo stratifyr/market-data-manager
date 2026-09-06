@@ -26,7 +26,7 @@ func (l *ltpLoader) Process(ctx *gofr.Context) (logs *Logs, err error) {
 
 	securities, err := l.securityServiceClient.GetSecurities(ctx, time.Now())
 	if err != nil {
-		return nil, err
+		return logs, err
 	}
 
 	var (
