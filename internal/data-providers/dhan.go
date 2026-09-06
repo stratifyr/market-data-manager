@@ -431,7 +431,7 @@ func extractDhanIDMappings() (map[string]int, map[int]string, error) {
 
 		rowNo++
 
-		if row[idxSeries] != "EQ" {
+		if row[idxSeries] != "EQ" && row[idxSeries] != "BE" {
 			continue
 		}
 
