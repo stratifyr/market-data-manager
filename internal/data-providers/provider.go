@@ -10,6 +10,7 @@ import (
 
 type Provider interface {
 	LTP(ctx *gofr.Context, symbols []string) (map[string]float64, error)
+	Volume(ctx *gofr.Context, symbols []string) (map[string]int, error)
 	OHLC(ctx *gofr.Context, symbols []string) (map[string]*OHLCData, error)
 	HistoricalOHLC(ctx *gofr.Context, isin string, startDate, endDate time.Time) ([]*HistoricalOHLC, error)
 }

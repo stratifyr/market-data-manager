@@ -127,6 +127,70 @@ func (c *client) LTP(ctx *gofr.Context, symbols []string) (map[string]float64, e
 	return ltpData, nil
 }
 
+func (c *client) Volume(ctx *gofr.Context, symbols []string) (map[string]int, error) {
+	if len(symbols) > 1000 {
+		return nil, errors.New("max limit is 1000 for bulk ltp fetch")
+	}
+
+	accessToken, err := c.getAccessToken(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := map[string][]int{
+		"NSE_EQ": make([]int, len(symbols)),
+	}
+
+	for i := range symbols {
+		payload["NSE_EQ"][i] = c.symbolToDhanID[symbols[i]]
+	}
+
+	body, _ := json.Marshal(payload)
+	headers := map[string]string{"Content-Type": "application/json", "access-token": accessToken, "client-id": c.clientID}
+
+	resp, err := ctx.GetHTTPService("dhan-api").PostWithHeaders(ctx, "v2/marketfeed/quote", nil, body, headers)
+	if err != nil {
+		return nil, errors.New("failed POST /v2/marketfeed/quote, err: " + err.Error())
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		b, _ := io.ReadAll(resp.Body)
+
+		return nil, errors.New("non 200 resp POST /v2/marketfeed/quote, resp: " + string(b))
+	}
+
+	var res struct {
+		Data struct {
+			NseEQ map[string]struct {
+				Volume int `json:"volume"`
+			} `json:"NSE_EQ"`
+		} `json:"data"`
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(&res)
+	if err != nil {
+		return nil, errors.New("unexpected resp POST /v2/marketfeed/quote, err: " + err.Error())
+	}
+
+	var volumeData = make(map[string]int)
+
+	for i := range symbols {
+		securityID := c.symbolToDhanID[symbols[i]]
+
+		data, ok := res.Data.NseEQ[strconv.Itoa(securityID)]
+		if !ok {
+			ctx.Warnf(fmt.Sprintf("missing data for %s, POST /v2/marketfeed/quote", symbols[i]))
+			continue
+		}
+
+		volumeData[symbols[i]] = data.Volume
+	}
+
+	return volumeData, nil
+}
+
 func (c *client) OHLC(ctx *gofr.Context, symbols []string) (map[string]*OHLCData, error) {
 	if len(symbols) > 1000 {
 		return nil, errors.New("max limit is 1000 for bulk ltp fetch")

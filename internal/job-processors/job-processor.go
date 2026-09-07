@@ -17,6 +17,7 @@ const (
 	LoadSecurityStats     = "LOAD_SECURITY_STATS"
 	BackfillSecurityStats = "BACKFILL_SECURITY_STATS"
 	LoadIndices           = "LOAD_INDICES"
+	LoadVolume            = "LOAD_VOLUME"
 )
 
 type JobProcessor interface {
@@ -40,6 +41,8 @@ func GetJobProcessor(marketDataJob string, dataProvider dataProviders.Provider, 
 		return NewStatsBackfiller(dataProvider, securityServiceClient), nil
 	case LoadIndices:
 		return NewIndicesLoader(securityServiceClient), nil
+	case LoadVolume:
+		return NewVolumeLoader(dataProvider, securityServiceClient), nil
 	default:
 		return nil, fmt.Errorf("invalid market data job type: %s", marketDataJob)
 	}
