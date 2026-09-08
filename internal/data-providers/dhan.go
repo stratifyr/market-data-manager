@@ -1,6 +1,7 @@
 package dataproviders
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/base32"
@@ -19,25 +20,21 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"gofr.dev/pkg/gofr"
+	"gofr.dev/pkg/gofr/logging"
+	"gofr.dev/pkg/gofr/service"
 )
 
 type client struct {
 	clientID       string
 	pin            string
 	totpSecret     string
-	symbolToDhanID map[string]int
-	dhanIDToSymbol map[int]string
+	dhanIDBySymbol map[string]int
 	accessToken    atomic.Value
 }
 
 func NewDhanHQClient(app *gofr.App) (*client, error) {
 	app.AddHTTPService("dhan-api", "https://api.dhan.co")
 	app.AddHTTPService("dhan-auth-api", "https://auth.dhan.co")
-
-	symbolToID, idToSymbol, err := extractDhanIDMappings()
-	if err != nil {
-		return nil, err
-	}
 
 	clientID := app.Config.Get("DHAN_CLIENT_ID")
 	if clientID == "" {
@@ -54,12 +51,16 @@ func NewDhanHQClient(app *gofr.App) (*client, error) {
 		return nil, errors.New("missing DHAN_TOTP_SECRET")
 	}
 
+	dhanIDBySymbol, err := extractDhanIDMappings(app.Logger(), "NSE_EQ", "EQ", "BE")
+	if err != nil {
+		return nil, err
+	}
+
 	return &client{
 		clientID:       clientID,
 		pin:            pin,
 		totpSecret:     totpSecret,
-		symbolToDhanID: symbolToID,
-		dhanIDToSymbol: idToSymbol,
+		dhanIDBySymbol: dhanIDBySymbol,
 	}, nil
 }
 
@@ -78,7 +79,7 @@ func (c *client) LTP(ctx *gofr.Context, symbols []string) (map[string]float64, e
 	}
 
 	for i := range symbols {
-		payload["NSE_EQ"][i] = c.symbolToDhanID[symbols[i]]
+		payload["NSE_EQ"][i] = c.dhanIDBySymbol[symbols[i]]
 	}
 
 	body, _ := json.Marshal(payload)
@@ -113,7 +114,7 @@ func (c *client) LTP(ctx *gofr.Context, symbols []string) (map[string]float64, e
 	var ltpData = make(map[string]float64)
 
 	for i := range symbols {
-		securityID := c.symbolToDhanID[symbols[i]]
+		securityID := c.dhanIDBySymbol[symbols[i]]
 
 		data, ok := res.Data.NseEQ[strconv.Itoa(securityID)]
 		if !ok {
@@ -128,64 +129,15 @@ func (c *client) LTP(ctx *gofr.Context, symbols []string) (map[string]float64, e
 }
 
 func (c *client) Volume(ctx *gofr.Context, symbols []string) (map[string]int, error) {
-	if len(symbols) > 1000 {
-		return nil, errors.New("max limit is 1000 for bulk ltp fetch")
-	}
-
-	accessToken, err := c.getAccessToken(ctx)
+	ohlcvData, err := c.OHLC(ctx, symbols)
 	if err != nil {
 		return nil, err
 	}
 
-	payload := map[string][]int{
-		"NSE_EQ": make([]int, len(symbols)),
-	}
+	var volumeData map[string]int
 
-	for i := range symbols {
-		payload["NSE_EQ"][i] = c.symbolToDhanID[symbols[i]]
-	}
-
-	body, _ := json.Marshal(payload)
-	headers := map[string]string{"Content-Type": "application/json", "access-token": accessToken, "client-id": c.clientID}
-
-	resp, err := ctx.GetHTTPService("dhan-api").PostWithHeaders(ctx, "v2/marketfeed/quote", nil, body, headers)
-	if err != nil {
-		return nil, errors.New("failed POST /v2/marketfeed/quote, err: " + err.Error())
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		b, _ := io.ReadAll(resp.Body)
-
-		return nil, errors.New("non 200 resp POST /v2/marketfeed/quote, resp: " + string(b))
-	}
-
-	var res struct {
-		Data struct {
-			NseEQ map[string]struct {
-				Volume int `json:"volume"`
-			} `json:"NSE_EQ"`
-		} `json:"data"`
-	}
-
-	err = json.NewDecoder(resp.Body).Decode(&res)
-	if err != nil {
-		return nil, errors.New("unexpected resp POST /v2/marketfeed/quote, err: " + err.Error())
-	}
-
-	var volumeData = make(map[string]int)
-
-	for i := range symbols {
-		securityID := c.symbolToDhanID[symbols[i]]
-
-		data, ok := res.Data.NseEQ[strconv.Itoa(securityID)]
-		if !ok {
-			ctx.Warnf(fmt.Sprintf("missing data for %s, POST /v2/marketfeed/quote", symbols[i]))
-			continue
-		}
-
-		volumeData[symbols[i]] = data.Volume
+	for symbol, ohlcv := range ohlcvData {
+		volumeData[symbol] = ohlcv.Volume
 	}
 
 	return volumeData, nil
@@ -206,7 +158,7 @@ func (c *client) OHLC(ctx *gofr.Context, symbols []string) (map[string]*OHLCData
 	}
 
 	for i := range symbols {
-		payload["NSE_EQ"][i] = c.symbolToDhanID[symbols[i]]
+		payload["NSE_EQ"][i] = c.dhanIDBySymbol[symbols[i]]
 	}
 
 	body, _ := json.Marshal(payload)
@@ -247,7 +199,7 @@ func (c *client) OHLC(ctx *gofr.Context, symbols []string) (map[string]*OHLCData
 	var ohlcData = make(map[string]*OHLCData)
 
 	for i := range symbols {
-		securityID := c.symbolToDhanID[symbols[i]]
+		securityID := c.dhanIDBySymbol[symbols[i]]
 
 		data, ok := res.Data.NseEQ[strconv.Itoa(securityID)]
 		if !ok {
@@ -274,7 +226,7 @@ func (c *client) HistoricalOHLC(ctx *gofr.Context, symbol string, startDate, end
 	}
 
 	payload := map[string]any{
-		"securityId":      c.symbolToDhanID[symbol],
+		"securityId":      c.dhanIDBySymbol[symbol],
 		"exchangeSegment": "NSE_EQ",
 		"instrument":      "EQUITY",
 		"expiryCode":      0,
@@ -429,22 +381,21 @@ func (c *client) generateTOTP() string {
 	return fmt.Sprintf("%06d", code%1000000)
 }
 
-func extractDhanIDMappings() (map[string]int, map[int]string, error) {
-	req, err := http.NewRequest(http.MethodGet, "https://api.dhan.co/v2/instrument/NSE_EQ", nil)
-	if err != nil {
-		return nil, nil, err
-	}
+func extractDhanIDMappings(logger logging.Logger, segment string, series ...string) (map[string]int, error) {
+	httpService := service.NewHTTPService("https://api.dhan.co", logger, nil)
+	apiName := fmt.Sprintf("v2/instrument/%s", segment)
 
-	c := &http.Client{Timeout: 30 * time.Second}
-	resp, err := c.Do(req)
+	resp, err := httpService.Get(context.TODO(), apiName, nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("download dhan scrip master: %w", err)
+		return nil, fmt.Errorf("failed GET /%s, err: %v", apiName, err)
 	}
 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, nil, fmt.Errorf("dhan scrip master http %s", resp.Status)
+		body, _ := io.ReadAll(resp.Body)
+
+		return nil, fmt.Errorf("non 200 resp GET /%s, err: %s", apiName, body)
 	}
 
 	reader := csv.NewReader(resp.Body)
@@ -452,7 +403,7 @@ func extractDhanIDMappings() (map[string]int, map[int]string, error) {
 
 	headers, err := reader.Read()
 	if err != nil {
-		return nil, nil, fmt.Errorf("read dhan csv headers: %w", err)
+		return nil, fmt.Errorf("read dhan csv headers: %w", err)
 	}
 
 	idx := func(col string) (int, error) {
@@ -464,23 +415,22 @@ func extractDhanIDMappings() (map[string]int, map[int]string, error) {
 		return i, nil
 	}
 
-	idxSymbol, err := idx("UNDERLYING_SYMBOL")
+	idxUnderlyingSymbol, err := idx("UNDERLYING_SYMBOL")
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	idxSecurityID, err := idx("SECURITY_ID")
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	idxSeries, err := idx("SERIES")
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	symbolToID := make(map[string]int)
-	idToSymbol := make(map[int]string)
+	underlyingSymbolToDhanID := make(map[string]int)
 
 	rowNo := 1
 	for {
@@ -490,21 +440,20 @@ func extractDhanIDMappings() (map[string]int, map[int]string, error) {
 		}
 
 		if err != nil {
-			return nil, nil, fmt.Errorf("read dhan csv row %d: %w", rowNo, err)
+			return nil, fmt.Errorf("read dhan csv row %d: %w", rowNo, err)
 		}
 
 		rowNo++
 
-		if row[idxSeries] != "EQ" && row[idxSeries] != "BE" {
+		if len(series) > 0 && !slices.Contains(series, row[idxSeries]) {
 			continue
 		}
 
-		symbol := strings.TrimSpace(row[idxSymbol])
+		symbol := strings.TrimSpace(row[idxUnderlyingSymbol])
 		id, _ := strconv.Atoi(row[idxSecurityID])
 
-		symbolToID[symbol] = id
-		idToSymbol[id] = symbol
+		underlyingSymbolToDhanID[symbol] = id
 	}
 
-	return symbolToID, idToSymbol, nil
+	return underlyingSymbolToDhanID, nil
 }
