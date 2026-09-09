@@ -10,6 +10,7 @@ import (
 	"time"
 
 	client "github.com/stratifyr/security-service-client"
+	"github.com/stratifyr/security-service-proto/go/pb"
 	"gofr.dev/pkg/gofr"
 	"gofr.dev/pkg/gofr/service"
 )
@@ -70,7 +71,12 @@ func (l *indicesLoader) Process(ctx *gofr.Context) (logs *Logs, err error) {
 			securityIDs = append(securityIDs, securityID)
 		}
 
-		if err = l.securityServiceClient.UpsertIndex(ctx, indexName, securityIDs); err != nil {
+		payload := &pb.UpsertIndexRequest{
+			Name:        indexName,
+			SecurityIds: securityIDs,
+		}
+
+		if err = l.securityServiceClient.UpsertIndex(ctx, payload); err != nil {
 			return logs, err
 		}
 

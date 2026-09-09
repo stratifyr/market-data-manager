@@ -21,7 +21,7 @@ func NewFreeFloatSharesLoader(securityServiceClient client.SecurityServiceClient
 }
 
 func (l *freeFloatSharesLoader) Process(ctx *gofr.Context) (logs *Logs, err error) {
-	logs = initializeJobLogs(LoadIndices)
+	logs = initializeJobLogs(LoadFreeFloatShares)
 	defer func() { recordJobCompletionLogs(logs, err) }()
 
 	securities, err := l.securityServiceClient.GetSecurities(ctx, time.Now())

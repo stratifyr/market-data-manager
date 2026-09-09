@@ -19,6 +19,9 @@ const (
 	LoadIndices           = "LOAD_INDICES"
 	LoadVolume            = "LOAD_VOLUME"
 	LoadFreeFloatShares   = "LOAD_FREE_FLOAT_SHARES"
+	LoadIndexValue        = "LOAD_INDEX_VALUE"
+	LoadIndexStats        = "LOAD_INDEX_STATS"
+	BackfillIndexStats    = "BACKFILL_INDEX_STATS"
 )
 
 type JobProcessor interface {
@@ -46,6 +49,12 @@ func GetJobProcessor(marketDataJob string, dataProvider dataProviders.Provider, 
 		return NewVolumeLoader(dataProvider, securityServiceClient), nil
 	case LoadFreeFloatShares:
 		return NewFreeFloatSharesLoader(securityServiceClient), nil
+	case LoadIndexValue:
+		return NewIndexValuesLoader(dataProvider, securityServiceClient), nil
+	case LoadIndexStats:
+		return NewIndexStatsLoader(dataProvider, securityServiceClient), nil
+	case BackfillIndexStats:
+		return NewIndexStatsBackfiller(dataProvider, securityServiceClient), nil
 	default:
 		return nil, fmt.Errorf("invalid market data job type: %s", marketDataJob)
 	}

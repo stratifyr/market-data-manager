@@ -25,11 +25,12 @@ import (
 )
 
 type client struct {
-	clientID       string
-	pin            string
-	totpSecret     string
-	dhanIDBySymbol map[string]int
-	accessToken    atomic.Value
+	clientID          string
+	pin               string
+	totpSecret        string
+	dhanIDBySymbol    map[string]int
+	dhanIDByIndexName map[string]int
+	accessToken       atomic.Value
 }
 
 func NewDhanHQClient(app *gofr.App) (*client, error) {
@@ -56,11 +57,17 @@ func NewDhanHQClient(app *gofr.App) (*client, error) {
 		return nil, err
 	}
 
+	dhanIDByIndexName, err := extractDhanIDMappings(app.Logger(), "IDX_I")
+	if err != nil {
+		return nil, err
+	}
+
 	return &client{
-		clientID:       clientID,
-		pin:            pin,
-		totpSecret:     totpSecret,
-		dhanIDBySymbol: dhanIDBySymbol,
+		clientID:          clientID,
+		pin:               pin,
+		totpSecret:        totpSecret,
+		dhanIDBySymbol:    dhanIDBySymbol,
+		dhanIDByIndexName: dhanIDByIndexName,
 	}, nil
 }
 
@@ -134,7 +141,7 @@ func (c *client) Volume(ctx *gofr.Context, symbols []string) (map[string]int, er
 		return nil, err
 	}
 
-	var volumeData map[string]int
+	var volumeData = make(map[string]int)
 
 	for symbol, ohlcv := range ohlcvData {
 		volumeData[symbol] = ohlcv.Volume
@@ -285,7 +292,215 @@ func (c *client) HistoricalOHLC(ctx *gofr.Context, symbol string, startDate, end
 	return historicalData, nil
 }
 
+func (c *client) IndexValue(ctx *gofr.Context, indexNames []string) (map[string]float64, error) {
+	if len(indexNames) > 1000 {
+		return nil, errors.New("max limit is 1000 for /v2/marketfeed/ltp")
+	}
+
+	accessToken, err := c.getAccessToken(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := map[string][]int{
+		"IDX_I": make([]int, len(indexNames)),
+	}
+
+	for i := range indexNames {
+		payload["IDX_I"][i] = c.dhanIDByIndexName[getDhanIndexName(indexNames[i])]
+	}
+
+	body, _ := json.Marshal(payload)
+	headers := map[string]string{"Content-Type": "application/json", "access-token": accessToken, "client-id": c.clientID}
+
+	resp, err := ctx.GetHTTPService("dhan-api").PostWithHeaders(ctx, "v2/marketfeed/ltp", nil, body, headers)
+	if err != nil {
+		return nil, errors.New("failed POST /v2/marketfeed/ltp, err: " + err.Error())
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		b, _ := io.ReadAll(resp.Body)
+
+		return nil, errors.New("non 200 resp POST /v2/marketfeed/ltp, resp: " + string(b))
+	}
+
+	var res struct {
+		Data struct {
+			IdxI map[string]struct {
+				Value float64 `json:"last_price"`
+			} `json:"IDX_I"`
+		} `json:"data"`
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(&res)
+	if err != nil {
+		return nil, errors.New("unexpected resp POST /v2/marketfeed/ltp, err: " + err.Error())
+	}
+
+	var valueData = make(map[string]float64)
+
+	for i := range indexNames {
+		securityID := c.dhanIDByIndexName[getDhanIndexName(indexNames[i])]
+
+		data, ok := res.Data.IdxI[strconv.Itoa(securityID)]
+		if !ok {
+			ctx.Warnf(fmt.Sprintf("missing data for %s, POST /v2/marketfeed/ltp", indexNames[i]))
+			continue
+		}
+
+		valueData[indexNames[i]] = data.Value
+	}
+
+	return valueData, nil
+}
+
+func (c *client) IndexOHLC(ctx *gofr.Context, indexNames []string) (map[string]*OHLCData, error) {
+	if len(indexNames) > 1000 {
+		return nil, errors.New("max limit is 1000 for /v2/marketfeed/quote")
+	}
+
+	accessToken, err := c.getAccessToken(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := map[string][]int{
+		"IDX_I": make([]int, len(indexNames)),
+	}
+
+	for i := range indexNames {
+		payload["IDX_I"][i] = c.dhanIDByIndexName[getDhanIndexName(indexNames[i])]
+	}
+
+	body, _ := json.Marshal(payload)
+	headers := map[string]string{"Content-Type": "application/json", "access-token": accessToken, "client-id": c.clientID}
+
+	resp, err := ctx.GetHTTPService("dhan-api").PostWithHeaders(ctx, "v2/marketfeed/quote", nil, body, headers)
+	if err != nil {
+		return nil, errors.New("failed POST /v2/marketfeed/quote, err: " + err.Error())
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		b, _ := io.ReadAll(resp.Body)
+
+		return nil, errors.New("non 200 resp POST /v2/marketfeed/quote, resp: " + string(b))
+	}
+
+	var res struct {
+		Data struct {
+			IdxI map[string]struct {
+				Volume float64 `json:"volume"`
+				Ohlc   struct {
+					Open  float64 `json:"open"`
+					High  float64 `json:"high"`
+					Low   float64 `json:"low"`
+					Close float64 `json:"close"`
+				} `json:"ohlc"`
+			} `json:"IDX_I"`
+		} `json:"data"`
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(&res)
+	if err != nil {
+		return nil, errors.New("unexpected resp POST /v2/marketfeed/quote, err: " + err.Error())
+	}
+
+	var ohlcData = make(map[string]*OHLCData)
+
+	for i := range indexNames {
+		securityID := c.dhanIDByIndexName[getDhanIndexName(indexNames[i])]
+
+		data, ok := res.Data.IdxI[strconv.Itoa(securityID)]
+		if !ok {
+			ctx.Warnf(fmt.Sprintf("missing data for %s, POST /v2/marketfeed/quote", indexNames[i]))
+			continue
+		}
+
+		ohlcData[indexNames[i]] = &OHLCData{
+			Open:   data.Ohlc.Open,
+			High:   data.Ohlc.High,
+			Low:    data.Ohlc.Low,
+			Close:  data.Ohlc.Close,
+			Volume: int(data.Volume),
+		}
+	}
+
+	return ohlcData, nil
+}
+
+func (c *client) IndexHistoricalOHLC(ctx *gofr.Context, indexName string, startDate, endDate time.Time) ([]*HistoricalOHLC, error) {
+	accessToken, err := c.getAccessToken(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := map[string]any{
+		"securityId":      c.dhanIDByIndexName[getDhanIndexName(indexName)],
+		"exchangeSegment": "IDX_I",
+		"instrument":      "INDEX",
+		"expiryCode":      0,
+		"oi":              false,
+		"fromDate":        startDate.Format(time.DateOnly),
+		"toDate":          endDate.AddDate(0, 0, 1).Format(time.DateOnly),
+	}
+
+	body, _ := json.Marshal(payload)
+	headers := map[string]string{"Content-Type": "application/json", "access-token": accessToken}
+
+	resp, err := ctx.GetHTTPService("dhan-api").PostWithHeaders(ctx, "v2/charts/historical", nil, body, headers)
+	if err != nil {
+		return nil, errors.New("failed POST /v2/charts/historical, err: " + err.Error())
+	}
+
+	if resp.StatusCode != 200 {
+		b, _ := io.ReadAll(resp.Body)
+
+		return nil, errors.New("non 200 resp POST /v2/charts/historical, resp: " + string(b))
+	}
+
+	defer resp.Body.Close()
+
+	var res struct {
+		Open      []float64 `json:"open"`
+		High      []float64 `json:"high"`
+		Low       []float64 `json:"low"`
+		Close     []float64 `json:"close"`
+		Volume    []float64 `json:"volume"`
+		Timestamp []float64 `json:"timestamp"`
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(&res)
+	if err != nil {
+		return nil, errors.New("unexpected resp POST /v2/charts/historical, err: " + err.Error())
+	}
+
+	var historicalData = make([]*HistoricalOHLC, len(res.Timestamp))
+
+	istLocation, _ := time.LoadLocation("Asia/Kolkata")
+
+	for i := range res.Timestamp {
+		historicalData[i] = &HistoricalOHLC{
+			Date: time.Unix(int64(res.Timestamp[i]), 0).In(istLocation),
+			OHLCData: &OHLCData{
+				Open:   res.Open[i],
+				High:   res.High[i],
+				Low:    res.Low[i],
+				Close:  res.Close[i],
+				Volume: int(res.Volume[i]),
+			},
+		}
+	}
+
+	return historicalData, nil
+}
+
 func (c *client) getAccessToken(ctx *gofr.Context) (string, error) {
+	return "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJ1c2VyUmVnaW9uIjoiUjEiLCJpc3MiOiJkaGFuIiwicGFydG5lcklkIjoiIiwiZXhwIjoxNzg4OTYxNDU5LCJpYXQiOjE3ODg4NzUwNTksInRva2VuQ29uc3VtZXJUeXBlIjoiU0VMRiIsIndlYmhvb2tVcmwiOiIiLCJkaGFuQ2xpZW50SWQiOiIxMTA2ODU0MDQ4In0.6SiFc5CnTDP81te2DOHnhCXALHlgkooERMJ-0FxpU462aGKY65Nt_YSqjmYxE20S7wbmLLbjFExZeAaaTmbmkw", nil
+
 	token, ok := c.accessToken.Load().(string)
 	if ok && !c.isTokenExpired(token) {
 		return token, nil
@@ -381,6 +596,19 @@ func (c *client) generateTOTP() string {
 	return fmt.Sprintf("%06d", code%1000000)
 }
 
+func getDhanIndexName(indexName string) string {
+	switch indexName {
+	case "NIFTY 50":
+		return "NIFTY"
+	case "NIFTY NEXT 50":
+		return "NIFTYNXT50"
+	case "NIFTY LARGEMIDCAP 250":
+		return "NIFTYLARGEMID250"
+	default:
+		return strings.ReplaceAll(indexName, " ", "")
+	}
+}
+
 func extractDhanIDMappings(logger logging.Logger, segment string, series ...string) (map[string]int, error) {
 	httpService := service.NewHTTPService("https://api.dhan.co", logger, nil)
 	apiName := fmt.Sprintf("v2/instrument/%s", segment)
@@ -449,10 +677,10 @@ func extractDhanIDMappings(logger logging.Logger, segment string, series ...stri
 			continue
 		}
 
-		symbol := strings.TrimSpace(row[idxUnderlyingSymbol])
+		underlyingSymbol := strings.ReplaceAll(row[idxUnderlyingSymbol], " ", "")
 		id, _ := strconv.Atoi(row[idxSecurityID])
 
-		underlyingSymbolToDhanID[symbol] = id
+		underlyingSymbolToDhanID[underlyingSymbol] = id
 	}
 
 	return underlyingSymbolToDhanID, nil
