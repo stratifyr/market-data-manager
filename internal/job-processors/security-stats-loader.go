@@ -12,16 +12,16 @@ import (
 	dataProviders "github.com/stratifyr/market-data-manager/internal/data-providers"
 )
 
-type statsLoader struct {
+type securityStatsLoader struct {
 	dataProvider          dataProviders.Provider
 	securityServiceClient client.SecurityServiceClient
 }
 
-func NewStatsLoader(dataProvider dataProviders.Provider, securityServiceClient client.SecurityServiceClient) JobProcessor {
-	return &statsLoader{dataProvider, securityServiceClient}
+func NewSecurityStatsLoader(dataProvider dataProviders.Provider, securityServiceClient client.SecurityServiceClient) JobProcessor {
+	return &securityStatsLoader{dataProvider, securityServiceClient}
 }
 
-func (s *statsLoader) Process(ctx *gofr.Context) (logs *Logs, err error) {
+func (s *securityStatsLoader) Process(ctx *gofr.Context) (logs *Logs, err error) {
 	logs = initializeJobLogs(LoadSecurityStats)
 	defer func() { recordJobCompletionLogs(logs, err) }()
 
@@ -51,26 +51,26 @@ func (s *statsLoader) Process(ctx *gofr.Context) (logs *Logs, err error) {
 		securityIDMap[securities[i].Symbol] = securities[i].Id
 	}
 
-	ohlcData, err := s.dataProvider.OHLC(ctx, symbols)
+	ohlcvData, err := s.dataProvider.EquityOHLCV(ctx, symbols)
 	if err != nil {
-		return logs, fmt.Errorf("failed to get ohlc data, err: %v", err)
+		return logs, err
 	}
 
 	for i := range symbols {
-		ohlc, ok := ohlcData[symbols[i]]
+		ohlcv, ok := ohlcvData[symbols[i]]
 		if !ok {
-			logs.Errors = append(logs.Errors, fmt.Sprintf("%s ohlc data not found", symbols[i]))
+			logs.Errors = append(logs.Errors, fmt.Sprintf("%s ohlcv data not found", symbols[i]))
 			continue
 		}
 
 		payload := &pb.CreateOrUpdateSecurityStatRequest{
 			SecurityId: securityIDMap[symbols[i]],
 			Date:       today.Format(time.DateOnly),
-			Open:       ohlc.Open,
-			Close:      ohlc.Close,
-			High:       ohlc.High,
-			Low:        ohlc.Low,
-			Volume:     int32(ohlc.Volume),
+			Open:       ohlcv.Open,
+			Close:      ohlcv.Close,
+			High:       ohlcv.High,
+			Low:        ohlcv.Low,
+			Volume:     int32(ohlcv.Volume),
 		}
 
 		if err = s.securityServiceClient.CreateOrUpdateSecurityStat(ctx, payload); err != nil {
@@ -78,7 +78,7 @@ func (s *statsLoader) Process(ctx *gofr.Context) (logs *Logs, err error) {
 			continue
 		}
 
-		logs.Success = append(logs.Success, fmt.Sprintf("%s %s", symbols[i], ohlc))
+		logs.Success = append(logs.Success, fmt.Sprintf("%s %s", symbols[i], ohlcv))
 		ctx.Logger.Info(logs.Success[len(logs.Success)-1])
 	}
 

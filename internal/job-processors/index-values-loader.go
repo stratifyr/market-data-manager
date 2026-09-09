@@ -22,7 +22,7 @@ func NewIndexValuesLoader(dataProvider dataProviders.Provider, securityServiceCl
 }
 
 func (l *indexValuesLoader) Process(ctx *gofr.Context) (logs *Logs, err error) {
-	logs = initializeJobLogs(LoadIndexValue)
+	logs = initializeJobLogs(LoadIndexValues)
 	defer func() { recordJobCompletionLogs(logs, err) }()
 
 	indices, err := l.securityServiceClient.GetIndices(ctx, time.Now())
@@ -57,7 +57,7 @@ func (l *indexValuesLoader) Process(ctx *gofr.Context) (logs *Logs, err error) {
 			continue
 		}
 
-		logs.Success = append(logs.Success, fmt.Sprintf("%s %0.2f", indexName, value))
+		logs.Success = append(logs.Success, fmt.Sprintf("%s {val=%0.2f}", indexName, value))
 		ctx.Logger.Info(logs.Success[len(logs.Success)-1])
 	}
 

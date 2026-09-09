@@ -13,16 +13,16 @@ import (
 	dataProviders "github.com/stratifyr/market-data-manager/internal/data-providers"
 )
 
-type statsBackfiller struct {
+type securityStatsBackfiller struct {
 	dataProvider          dataProviders.Provider
 	securityServiceClient client.SecurityServiceClient
 }
 
-func NewStatsBackfiller(dataProvider dataProviders.Provider, securityServiceClient client.SecurityServiceClient) JobProcessor {
-	return &statsBackfiller{dataProvider: dataProvider, securityServiceClient: securityServiceClient}
+func NewSecurityStatsBackfiller(dataProvider dataProviders.Provider, securityServiceClient client.SecurityServiceClient) JobProcessor {
+	return &securityStatsBackfiller{dataProvider: dataProvider, securityServiceClient: securityServiceClient}
 }
 
-func (s *statsBackfiller) Process(ctx *gofr.Context) (logs *Logs, err error) {
+func (s *securityStatsBackfiller) Process(ctx *gofr.Context) (logs *Logs, err error) {
 	logs = initializeJobLogs(BackfillSecurityStats)
 	defer func() { recordJobCompletionLogs(logs, err) }()
 
@@ -52,7 +52,7 @@ func (s *statsBackfiller) Process(ctx *gofr.Context) (logs *Logs, err error) {
 	}
 
 	for i := range symbols {
-		historicalData, err := s.dataProvider.HistoricalOHLC(ctx, symbols[i], startDate, endDate)
+		historicalData, err := s.dataProvider.EquityHistoricalOHLCV(ctx, symbols[i], startDate, endDate)
 		if err != nil {
 			logs.Errors = append(logs.Errors, fmt.Sprintf("%s %v", symbols[i], err))
 			continue
@@ -68,19 +68,19 @@ func (s *statsBackfiller) Process(ctx *gofr.Context) (logs *Logs, err error) {
 
 		for j, date := range marketDays {
 			if j == len(marketDays)-1 {
-				logs.Success = append(logs.Success, fmt.Sprintf("%s %s - %s",
+				logs.Success = append(logs.Success, fmt.Sprintf("%s {start=%s end=%s}",
 					symbols[i], marketDays[0].Format(time.DateOnly), date.Format(time.DateOnly)))
 
 				ctx.Logger.Info(logs.Success[len(logs.Success)-1])
 			}
 
-			idx := slices.IndexFunc(historicalData, func(ohlc *dataProviders.HistoricalOHLC) bool {
+			idx := slices.IndexFunc(historicalData, func(ohlc *dataProviders.HistoricalOHLCV) bool {
 				return ohlc.Date.Format(time.DateOnly) == date.Format(time.DateOnly)
 			})
 
 			if idx == -1 {
 				if j != len(marketDays)-1 {
-					logs.Success = append(logs.Success, fmt.Sprintf("%s %s - %s",
+					logs.Success = append(logs.Success, fmt.Sprintf("%s {start=%s end=%s}",
 						symbols[i], marketDays[0].Format(time.DateOnly), date.Format(time.DateOnly)))
 				}
 

@@ -8,20 +8,21 @@ import (
 	"time"
 
 	client "github.com/stratifyr/security-service-client"
+	"github.com/stratifyr/security-service-proto/go/pb"
 	"gofr.dev/pkg/gofr"
 	"gofr.dev/pkg/gofr/service"
 )
 
-type freeFloatSharesLoader struct {
+type securitySharesLoader struct {
 	securityServiceClient client.SecurityServiceClient
 }
 
-func NewFreeFloatSharesLoader(securityServiceClient client.SecurityServiceClient) JobProcessor {
-	return &freeFloatSharesLoader{securityServiceClient: securityServiceClient}
+func NewSecuritySharesLoader(securityServiceClient client.SecurityServiceClient) JobProcessor {
+	return &securitySharesLoader{securityServiceClient: securityServiceClient}
 }
 
-func (l *freeFloatSharesLoader) Process(ctx *gofr.Context) (logs *Logs, err error) {
-	logs = initializeJobLogs(LoadFreeFloatShares)
+func (l *securitySharesLoader) Process(ctx *gofr.Context) (logs *Logs, err error) {
+	logs = initializeJobLogs(LoadSecurityShares)
 	defer func() { recordJobCompletionLogs(logs, err) }()
 
 	securities, err := l.securityServiceClient.GetSecurities(ctx, time.Now())
@@ -41,7 +42,7 @@ func (l *freeFloatSharesLoader) Process(ctx *gofr.Context) (logs *Logs, err erro
 
 	freeFloatSharesMap, err := l.getFreeFloatShares(ctx, symbols)
 	if err != nil {
-		return logs, fmt.Errorf("failed to get volume data, err: %v", err)
+		return logs, err
 	}
 
 	for i := range symbols {
@@ -51,19 +52,24 @@ func (l *freeFloatSharesLoader) Process(ctx *gofr.Context) (logs *Logs, err erro
 			continue
 		}
 
-		if err = l.securityServiceClient.UpdateSecurityFreeFloatShares(ctx, securityIDBySymbol[symbols[i]], int64(freeFloatShares)); err != nil {
+		payload := &pb.UpdateSecurityRequest{
+			Id:              securityIDBySymbol[symbols[i]],
+			FreeFloatShares: int64(freeFloatShares),
+		}
+
+		if err = l.securityServiceClient.UpdateSecurity(ctx, payload); err != nil {
 			logs.Errors = append(logs.Errors, fmt.Sprint(symbols[i], err))
 			continue
 		}
 
-		logs.Success = append(logs.Success, fmt.Sprintf("%s %d", symbols[i], freeFloatShares))
+		logs.Success = append(logs.Success, fmt.Sprintf("%s {shares=%d}", symbols[i], freeFloatShares))
 		ctx.Logger.Info(logs.Success[len(logs.Success)-1])
 	}
 
 	return logs, nil
 }
 
-func (l *freeFloatSharesLoader) getFreeFloatShares(ctx *gofr.Context, symbols []string) (map[string]int, error) {
+func (l *securitySharesLoader) getFreeFloatShares(ctx *gofr.Context, symbols []string) (map[string]int, error) {
 	var targetSymbols = make(map[string]struct{})
 	for _, symbol := range symbols {
 		targetSymbols[symbol] = struct{}{}

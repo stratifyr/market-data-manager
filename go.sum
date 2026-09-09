@@ -185,8 +185,8 @@ github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0t
 github.com/rogpeppe/go-internal v1.14.1/go.mod h1:MaRKkUm5W0goXpeCfT7UZI6fk/L7L7so1lCWt35ZSgc=
 github.com/segmentio/kafka-go v0.4.51 h1:JgDPPG75tC1rWIS2Me6MwcvXJ6f49UQ4HjAOef71Hno=
 github.com/segmentio/kafka-go v0.4.51/go.mod h1:Y1gn60kzLEEaW28YshXyk2+VCUKbJ3Qr6DrnT3i4+9E=
-github.com/stratifyr/security-service-client v0.0.0-20260909132624-16b08012d31f h1:Y1s+151TkIjpLKC/dMPba4vxNiiQkMzIeNxAm/A5wXA=
-github.com/stratifyr/security-service-client v0.0.0-20260909132624-16b08012d31f/go.mod h1:1VPFUcZWP/r8aeXhfE3QG6Gu3I5B+jEX+zVEVCW0RDU=
+github.com/stratifyr/security-service-client v0.0.0-20260909145834-868ccc9839bb h1:p8g+5UbpXjGwGWuvcZcjWxmPffq4qBnJBYrZZuhWlkA=
+github.com/stratifyr/security-service-client v0.0.0-20260909145834-868ccc9839bb/go.mod h1:1VPFUcZWP/r8aeXhfE3QG6Gu3I5B+jEX+zVEVCW0RDU=
 github.com/stratifyr/security-service-proto v0.0.0-20260908193236-5bbc3893fd2f h1:FQJ6SR7Va4EWgzUU5hGba/dEHiIVe6c5k0x0DdVrjto=
 github.com/stratifyr/security-service-proto v0.0.0-20260908193236-5bbc3893fd2f/go.mod h1:dalkEH/ukUUWb6GQukASalK50IHhgjaFOXuPnVmXQq0=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=

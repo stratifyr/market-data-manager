@@ -71,7 +71,7 @@ func NewDhanHQClient(app *gofr.App) (*client, error) {
 	}, nil
 }
 
-func (c *client) LTP(ctx *gofr.Context, symbols []string) (map[string]float64, error) {
+func (c *client) EquityLTP(ctx *gofr.Context, symbols []string) (map[string]float64, error) {
 	if len(symbols) > 1000 {
 		return nil, errors.New("max limit is 1000 for bulk ltp fetch")
 	}
@@ -135,22 +135,7 @@ func (c *client) LTP(ctx *gofr.Context, symbols []string) (map[string]float64, e
 	return ltpData, nil
 }
 
-func (c *client) Volume(ctx *gofr.Context, symbols []string) (map[string]int, error) {
-	ohlcvData, err := c.OHLC(ctx, symbols)
-	if err != nil {
-		return nil, err
-	}
-
-	var volumeData = make(map[string]int)
-
-	for symbol, ohlcv := range ohlcvData {
-		volumeData[symbol] = ohlcv.Volume
-	}
-
-	return volumeData, nil
-}
-
-func (c *client) OHLC(ctx *gofr.Context, symbols []string) (map[string]*OHLCData, error) {
+func (c *client) EquityOHLCV(ctx *gofr.Context, symbols []string) (map[string]*OHLCVData, error) {
 	if len(symbols) > 1000 {
 		return nil, errors.New("max limit is 1000 for bulk ltp fetch")
 	}
@@ -203,7 +188,7 @@ func (c *client) OHLC(ctx *gofr.Context, symbols []string) (map[string]*OHLCData
 		return nil, errors.New("unexpected resp POST /v2/marketfeed/quote, err: " + err.Error())
 	}
 
-	var ohlcData = make(map[string]*OHLCData)
+	var ohlcData = make(map[string]*OHLCVData)
 
 	for i := range symbols {
 		securityID := c.dhanIDBySymbol[symbols[i]]
@@ -214,7 +199,7 @@ func (c *client) OHLC(ctx *gofr.Context, symbols []string) (map[string]*OHLCData
 			continue
 		}
 
-		ohlcData[symbols[i]] = &OHLCData{
+		ohlcData[symbols[i]] = &OHLCVData{
 			Open:   data.Ohlc.Open,
 			High:   data.Ohlc.High,
 			Low:    data.Ohlc.Low,
@@ -226,7 +211,7 @@ func (c *client) OHLC(ctx *gofr.Context, symbols []string) (map[string]*OHLCData
 	return ohlcData, nil
 }
 
-func (c *client) HistoricalOHLC(ctx *gofr.Context, symbol string, startDate, endDate time.Time) ([]*HistoricalOHLC, error) {
+func (c *client) EquityHistoricalOHLCV(ctx *gofr.Context, symbol string, startDate, endDate time.Time) ([]*HistoricalOHLCV, error) {
 	accessToken, err := c.getAccessToken(ctx)
 	if err != nil {
 		return nil, err
@@ -272,14 +257,14 @@ func (c *client) HistoricalOHLC(ctx *gofr.Context, symbol string, startDate, end
 		return nil, errors.New("unexpected resp POST /v2/charts/historical, err: " + err.Error())
 	}
 
-	var historicalData = make([]*HistoricalOHLC, len(res.Timestamp))
+	var historicalData = make([]*HistoricalOHLCV, len(res.Timestamp))
 
 	istLocation, _ := time.LoadLocation("Asia/Kolkata")
 
 	for i := range res.Timestamp {
-		historicalData[i] = &HistoricalOHLC{
+		historicalData[i] = &HistoricalOHLCV{
 			Date: time.Unix(int64(res.Timestamp[i]), 0).In(istLocation),
-			OHLCData: &OHLCData{
+			OHLCVData: &OHLCVData{
 				Open:   res.Open[i],
 				High:   res.High[i],
 				Low:    res.Low[i],
@@ -356,7 +341,7 @@ func (c *client) IndexValue(ctx *gofr.Context, indexNames []string) (map[string]
 	return valueData, nil
 }
 
-func (c *client) IndexOHLC(ctx *gofr.Context, indexNames []string) (map[string]*OHLCData, error) {
+func (c *client) IndexOHLCV(ctx *gofr.Context, indexNames []string) (map[string]*OHLCVData, error) {
 	if len(indexNames) > 1000 {
 		return nil, errors.New("max limit is 1000 for /v2/marketfeed/quote")
 	}
@@ -409,7 +394,7 @@ func (c *client) IndexOHLC(ctx *gofr.Context, indexNames []string) (map[string]*
 		return nil, errors.New("unexpected resp POST /v2/marketfeed/quote, err: " + err.Error())
 	}
 
-	var ohlcData = make(map[string]*OHLCData)
+	var ohlcData = make(map[string]*OHLCVData)
 
 	for i := range indexNames {
 		securityID := c.dhanIDByIndexName[getDhanIndexName(indexNames[i])]
@@ -420,7 +405,7 @@ func (c *client) IndexOHLC(ctx *gofr.Context, indexNames []string) (map[string]*
 			continue
 		}
 
-		ohlcData[indexNames[i]] = &OHLCData{
+		ohlcData[indexNames[i]] = &OHLCVData{
 			Open:   data.Ohlc.Open,
 			High:   data.Ohlc.High,
 			Low:    data.Ohlc.Low,
@@ -432,7 +417,7 @@ func (c *client) IndexOHLC(ctx *gofr.Context, indexNames []string) (map[string]*
 	return ohlcData, nil
 }
 
-func (c *client) IndexHistoricalOHLC(ctx *gofr.Context, indexName string, startDate, endDate time.Time) ([]*HistoricalOHLC, error) {
+func (c *client) IndexHistoricalOHLCV(ctx *gofr.Context, indexName string, startDate, endDate time.Time) ([]*HistoricalOHLCV, error) {
 	accessToken, err := c.getAccessToken(ctx)
 	if err != nil {
 		return nil, err
@@ -478,14 +463,14 @@ func (c *client) IndexHistoricalOHLC(ctx *gofr.Context, indexName string, startD
 		return nil, errors.New("unexpected resp POST /v2/charts/historical, err: " + err.Error())
 	}
 
-	var historicalData = make([]*HistoricalOHLC, len(res.Timestamp))
+	var historicalData = make([]*HistoricalOHLCV, len(res.Timestamp))
 
 	istLocation, _ := time.LoadLocation("Asia/Kolkata")
 
 	for i := range res.Timestamp {
-		historicalData[i] = &HistoricalOHLC{
+		historicalData[i] = &HistoricalOHLCV{
 			Date: time.Unix(int64(res.Timestamp[i]), 0).In(istLocation),
-			OHLCData: &OHLCData{
+			OHLCVData: &OHLCVData{
 				Open:   res.Open[i],
 				High:   res.High[i],
 				Low:    res.Low[i],
@@ -499,8 +484,6 @@ func (c *client) IndexHistoricalOHLC(ctx *gofr.Context, indexName string, startD
 }
 
 func (c *client) getAccessToken(ctx *gofr.Context) (string, error) {
-	return "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJ1c2VyUmVnaW9uIjoiUjEiLCJpc3MiOiJkaGFuIiwicGFydG5lcklkIjoiIiwiZXhwIjoxNzg4OTYxNDU5LCJpYXQiOjE3ODg4NzUwNTksInRva2VuQ29uc3VtZXJUeXBlIjoiU0VMRiIsIndlYmhvb2tVcmwiOiIiLCJkaGFuQ2xpZW50SWQiOiIxMTA2ODU0MDQ4In0.6SiFc5CnTDP81te2DOHnhCXALHlgkooERMJ-0FxpU462aGKY65Nt_YSqjmYxE20S7wbmLLbjFExZeAaaTmbmkw", nil
-
 	token, ok := c.accessToken.Load().(string)
 	if ok && !c.isTokenExpired(token) {
 		return token, nil

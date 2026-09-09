@@ -13,13 +13,13 @@ import (
 )
 
 const (
-	LoadLTP               = "LOAD_LTP"
+	LoadSecurities        = "LOAD_SECURITIES"
+	LoadSecurityValues    = "LOAD_SECURITY_VALUES"
 	LoadSecurityStats     = "LOAD_SECURITY_STATS"
+	LoadSecurityShares    = "LOAD_SECURITY_SHARES"
 	BackfillSecurityStats = "BACKFILL_SECURITY_STATS"
 	LoadIndices           = "LOAD_INDICES"
-	LoadVolume            = "LOAD_VOLUME"
-	LoadFreeFloatShares   = "LOAD_FREE_FLOAT_SHARES"
-	LoadIndexValue        = "LOAD_INDEX_VALUE"
+	LoadIndexValues       = "LOAD_INDEX_VALUES"
 	LoadIndexStats        = "LOAD_INDEX_STATS"
 	BackfillIndexStats    = "BACKFILL_INDEX_STATS"
 )
@@ -37,19 +37,17 @@ type Logs struct {
 
 func GetJobProcessor(marketDataJob string, dataProvider dataProviders.Provider, securityServiceClient client.SecurityServiceClient) (JobProcessor, error) {
 	switch marketDataJob {
-	case LoadLTP:
-		return NewLtpLoader(dataProvider, securityServiceClient), nil
+	case LoadSecurityValues:
+		return NewSecurityValuesLoader(dataProvider, securityServiceClient), nil
 	case LoadSecurityStats:
-		return NewStatsLoader(dataProvider, securityServiceClient), nil
+		return NewSecurityStatsLoader(dataProvider, securityServiceClient), nil
+	case LoadSecurityShares:
+		return NewSecuritySharesLoader(securityServiceClient), nil
 	case BackfillSecurityStats:
-		return NewStatsBackfiller(dataProvider, securityServiceClient), nil
+		return NewSecurityStatsBackfiller(dataProvider, securityServiceClient), nil
 	case LoadIndices:
 		return NewIndicesLoader(securityServiceClient), nil
-	case LoadVolume:
-		return NewVolumeLoader(dataProvider, securityServiceClient), nil
-	case LoadFreeFloatShares:
-		return NewFreeFloatSharesLoader(securityServiceClient), nil
-	case LoadIndexValue:
+	case LoadIndexValues:
 		return NewIndexValuesLoader(dataProvider, securityServiceClient), nil
 	case LoadIndexStats:
 		return NewIndexStatsLoader(dataProvider, securityServiceClient), nil

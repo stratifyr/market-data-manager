@@ -9,13 +9,12 @@ import (
 )
 
 type Provider interface {
-	LTP(ctx *gofr.Context, symbols []string) (map[string]float64, error)
-	Volume(ctx *gofr.Context, symbols []string) (map[string]int, error)
-	OHLC(ctx *gofr.Context, symbols []string) (map[string]*OHLCData, error)
-	HistoricalOHLC(ctx *gofr.Context, symbol string, startDate, endDate time.Time) ([]*HistoricalOHLC, error)
+	EquityLTP(ctx *gofr.Context, symbols []string) (map[string]float64, error)
+	EquityOHLCV(ctx *gofr.Context, symbols []string) (map[string]*OHLCVData, error)
+	EquityHistoricalOHLCV(ctx *gofr.Context, symbol string, startDate, endDate time.Time) ([]*HistoricalOHLCV, error)
 	IndexValue(ctx *gofr.Context, indexNames []string) (map[string]float64, error)
-	IndexOHLC(ctx *gofr.Context, indexNames []string) (map[string]*OHLCData, error)
-	IndexHistoricalOHLC(ctx *gofr.Context, symbol string, startDate, endDate time.Time) ([]*HistoricalOHLC, error)
+	IndexOHLCV(ctx *gofr.Context, indexNames []string) (map[string]*OHLCVData, error)
+	IndexHistoricalOHLCV(ctx *gofr.Context, symbol string, startDate, endDate time.Time) ([]*HistoricalOHLCV, error)
 }
 
 func New(app *gofr.App) (Provider, error) {
@@ -27,7 +26,7 @@ func New(app *gofr.App) (Provider, error) {
 	}
 }
 
-type OHLCData struct {
+type OHLCVData struct {
 	Open   float64
 	High   float64
 	Low    float64
@@ -35,11 +34,11 @@ type OHLCData struct {
 	Volume int
 }
 
-type HistoricalOHLC struct {
+type HistoricalOHLCV struct {
 	Date time.Time
-	*OHLCData
+	*OHLCVData
 }
 
-func (o OHLCData) String() string {
+func (o OHLCVData) String() string {
 	return fmt.Sprintf("{o=%0.2f, h=%0.2f, l=%0.2f, c=%0.2f, v=%d}", o.Open, o.High, o.Low, o.Close, o.Volume)
 }

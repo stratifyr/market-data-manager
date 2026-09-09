@@ -51,25 +51,25 @@ func (s *indexStatsLoader) Process(ctx *gofr.Context) (logs *Logs, err error) {
 		indexIDMap[indices[i].Name] = indices[i].Id
 	}
 
-	ohlcData, err := s.dataProvider.IndexOHLC(ctx, indexNames)
+	ohlcvData, err := s.dataProvider.IndexOHLCV(ctx, indexNames)
 	if err != nil {
 		return logs, err
 	}
 
 	for _, indexName := range indexNames {
-		ohlc, ok := ohlcData[indexName]
+		ohlcv, ok := ohlcvData[indexName]
 		if !ok {
-			logs.Errors = append(logs.Errors, fmt.Sprintf("%s ohlc data not found", indexName))
+			logs.Errors = append(logs.Errors, fmt.Sprintf("%s ohlcv data not found", indexName))
 			continue
 		}
 
 		payload := &pb.UpsertIndexStatRequest{
 			IndexId: indexIDMap[indexName],
 			Date:    today.Format(time.DateOnly),
-			Open:    ohlc.Open,
-			Close:   ohlc.Close,
-			High:    ohlc.High,
-			Low:     ohlc.Low,
+			Open:    ohlcv.Open,
+			Close:   ohlcv.Close,
+			High:    ohlcv.High,
+			Low:     ohlcv.Low,
 		}
 
 		if err = s.securityServiceClient.UpsertIndexStat(ctx, payload); err != nil {
@@ -77,7 +77,7 @@ func (s *indexStatsLoader) Process(ctx *gofr.Context) (logs *Logs, err error) {
 			continue
 		}
 
-		logs.Success = append(logs.Success, fmt.Sprintf("%s %s", indexName, ohlc))
+		logs.Success = append(logs.Success, fmt.Sprintf("%s %s", indexName, ohlcv))
 		ctx.Logger.Info(logs.Success[len(logs.Success)-1])
 	}
 

@@ -80,7 +80,7 @@ func (l *indicesLoader) Process(ctx *gofr.Context) (logs *Logs, err error) {
 			return logs, err
 		}
 
-		logs.Success = append(logs.Success, fmt.Sprintf("%s [%d]{%s}", indexName, len(symbols), strings.Join(symbols, ",")))
+		logs.Success = append(logs.Success, fmt.Sprintf("%s {count=%d, symbols=%s}", indexName, len(symbols), strings.Join(symbols, ",")))
 		ctx.Logger.Info(logs.Success[len(logs.Success)-1])
 	}
 

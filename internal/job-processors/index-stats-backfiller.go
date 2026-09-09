@@ -52,7 +52,7 @@ func (s *indexStatsBackfiller) Process(ctx *gofr.Context) (logs *Logs, err error
 	}
 
 	for i := range indexNames {
-		historicalData, err := s.dataProvider.IndexHistoricalOHLC(ctx, indexNames[i], startDate, endDate)
+		historicalData, err := s.dataProvider.IndexHistoricalOHLCV(ctx, indexNames[i], startDate, endDate)
 		if err != nil {
 			logs.Errors = append(logs.Errors, fmt.Sprintf("%s %v", indexNames[i], err))
 			continue
@@ -68,19 +68,19 @@ func (s *indexStatsBackfiller) Process(ctx *gofr.Context) (logs *Logs, err error
 
 		for j, date := range marketDays {
 			if j == len(marketDays)-1 {
-				logs.Success = append(logs.Success, fmt.Sprintf("%s %s - %s",
+				logs.Success = append(logs.Success, fmt.Sprintf("%s {start=%s end=%s}",
 					indexNames[i], marketDays[0].Format(time.DateOnly), date.Format(time.DateOnly)))
 
 				ctx.Logger.Info(logs.Success[len(logs.Success)-1])
 			}
 
-			idx := slices.IndexFunc(historicalData, func(ohlc *dataProviders.HistoricalOHLC) bool {
+			idx := slices.IndexFunc(historicalData, func(ohlc *dataProviders.HistoricalOHLCV) bool {
 				return ohlc.Date.Format(time.DateOnly) == date.Format(time.DateOnly)
 			})
 
 			if idx == -1 {
 				if j != len(marketDays)-1 {
-					logs.Success = append(logs.Success, fmt.Sprintf("%s %s - %s",
+					logs.Success = append(logs.Success, fmt.Sprintf("%s {start=%s end=%s}",
 						indexNames[i], marketDays[0].Format(time.DateOnly), date.Format(time.DateOnly)))
 				}
 
