@@ -4,8 +4,8 @@ go 1.26.0
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/stratifyr/security-service-client v0.0.0-20260909145834-868ccc9839bb
-	github.com/stratifyr/security-service-proto v0.0.0-20260908193236-5bbc3893fd2f
+	github.com/stratifyr/security-service-client v0.0.0-20261001184411-ada94b195e47
+	github.com/stratifyr/security-service-proto v0.0.0-20261001184201-8ca97edcd288
 	gofr.dev v1.59.0
 )
 

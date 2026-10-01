@@ -89,7 +89,7 @@ func (s *securityStatsBackfiller) Process(ctx *gofr.Context) (logs *Logs, err er
 				break
 			}
 
-			payload := &pb.CreateOrUpdateSecurityStatRequest{
+			payload := &pb.UpsertSecurityStatRequest{
 				SecurityId: securityIDMap[symbols[i]],
 				Date:       date.Format(time.DateOnly),
 				Open:       historicalData[idx].Open,
@@ -99,7 +99,7 @@ func (s *securityStatsBackfiller) Process(ctx *gofr.Context) (logs *Logs, err er
 				Volume:     int32(historicalData[idx].Volume),
 			}
 
-			if err = s.securityServiceClient.CreateOrUpdateSecurityStat(ctx, payload); err != nil {
+			if err = s.securityServiceClient.UpsertSecurityStat(ctx, payload); err != nil {
 				logs.Errors = append(logs.Errors, fmt.Sprintf("%s %s %v", symbols[i], date.Format(time.DateOnly), err))
 				continue
 			}

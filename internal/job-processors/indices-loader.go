@@ -145,6 +145,11 @@ func (l *indicesLoader) getIndexConstituents(ctx *gofr.Context, indexName string
 
 		symbol := strings.TrimSpace(row[idxSymbol])
 
+		if strings.Contains(symbol, "DUMMY") {
+			ctx.Logger.Warnf("skipping %s in %s", symbol, fileName)
+			continue
+		}
+
 		symbols = append(symbols, symbol)
 	}
 

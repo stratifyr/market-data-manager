@@ -63,7 +63,7 @@ func (s *securityStatsLoader) Process(ctx *gofr.Context) (logs *Logs, err error)
 			continue
 		}
 
-		payload := &pb.CreateOrUpdateSecurityStatRequest{
+		payload := &pb.UpsertSecurityStatRequest{
 			SecurityId: securityIDMap[symbols[i]],
 			Date:       today.Format(time.DateOnly),
 			Open:       ohlcv.Open,
@@ -73,7 +73,7 @@ func (s *securityStatsLoader) Process(ctx *gofr.Context) (logs *Logs, err error)
 			Volume:     int32(ohlcv.Volume),
 		}
 
-		if err = s.securityServiceClient.CreateOrUpdateSecurityStat(ctx, payload); err != nil {
+		if err = s.securityServiceClient.UpsertSecurityStat(ctx, payload); err != nil {
 			logs.Errors = append(logs.Errors, fmt.Sprintf("%s %v", symbols[i], err))
 			continue
 		}

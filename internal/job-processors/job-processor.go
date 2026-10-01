@@ -37,6 +37,8 @@ type Logs struct {
 
 func GetJobProcessor(marketDataJob string, dataProvider dataProviders.Provider, securityServiceClient client.SecurityServiceClient) (JobProcessor, error) {
 	switch marketDataJob {
+	case LoadSecurities:
+		return NewSecuritiesLoader(securityServiceClient), nil
 	case LoadSecurityValues:
 		return NewSecurityValuesLoader(dataProvider, securityServiceClient), nil
 	case LoadSecurityStats:

@@ -30,14 +30,10 @@ func (l *securityValuesLoader) Process(ctx *gofr.Context) (logs *Logs, err error
 		return logs, err
 	}
 
-	var (
-		symbols       = make([]string, len(securities))
-		securityIDMap = make(map[string]int32)
-	)
+	var symbols = make([]string, len(securities))
 
 	for i := range securities {
 		symbols[i] = securities[i].Symbol
-		securityIDMap[securities[i].Symbol] = securities[i].Id
 	}
 
 	ltpValues, err := l.dataProvider.EquityLTP(ctx, symbols)
@@ -65,13 +61,13 @@ func (l *securityValuesLoader) Process(ctx *gofr.Context) (logs *Logs, err error
 			continue
 		}
 
-		payload := &pb.UpdateSecurityRequest{
-			Id:     securityIDMap[symbols[i]],
+		payload := &pb.UpsertSecurityRequest{
+			Symbol: symbols[i],
 			Ltp:    ltp,
 			Volume: int64(ohlcv.Volume),
 		}
 
-		if err = l.securityServiceClient.UpdateSecurity(ctx, payload); err != nil {
+		if err = l.securityServiceClient.UpsertSecurity(ctx, payload); err != nil {
 			logs.Errors = append(logs.Errors, fmt.Sprint(symbols[i], err))
 			continue
 		}

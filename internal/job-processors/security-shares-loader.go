@@ -30,14 +30,10 @@ func (l *securitySharesLoader) Process(ctx *gofr.Context) (logs *Logs, err error
 		return logs, err
 	}
 
-	var (
-		symbols            = make([]string, len(securities))
-		securityIDBySymbol = make(map[string]int32)
-	)
+	var symbols = make([]string, len(securities))
 
 	for i := range securities {
 		symbols[i] = securities[i].Symbol
-		securityIDBySymbol[securities[i].Symbol] = securities[i].Id
 	}
 
 	freeFloatSharesMap, err := l.getFreeFloatShares(ctx, symbols)
@@ -52,12 +48,12 @@ func (l *securitySharesLoader) Process(ctx *gofr.Context) (logs *Logs, err error
 			continue
 		}
 
-		payload := &pb.UpdateSecurityRequest{
-			Id:              securityIDBySymbol[symbols[i]],
+		payload := &pb.UpsertSecurityRequest{
+			Symbol:          symbols[i],
 			FreeFloatShares: int64(freeFloatShares),
 		}
 
-		if err = l.securityServiceClient.UpdateSecurity(ctx, payload); err != nil {
+		if err = l.securityServiceClient.UpsertSecurity(ctx, payload); err != nil {
 			logs.Errors = append(logs.Errors, fmt.Sprint(symbols[i], err))
 			continue
 		}
