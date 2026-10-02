@@ -52,7 +52,7 @@ func NewDhanHQClient(app *gofr.App) (*client, error) {
 		return nil, errors.New("missing DHAN_TOTP_SECRET")
 	}
 
-	dhanIDBySymbol, err := extractDhanIDMappings(app.Logger(), "NSE_EQ", "EQ", "BE")
+	dhanIDBySymbol, err := extractDhanIDMappings(app.Logger(), "NSE_EQ", "EQ", "BE", "RR")
 	if err != nil {
 		return nil, err
 	}
