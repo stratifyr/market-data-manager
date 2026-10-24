@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	client "github.com/stratifyr/security-service-client"
 	"github.com/stratifyr/security-service-proto/go/pb"
@@ -25,7 +24,7 @@ func (l *securitySharesLoader) Process(ctx *gofr.Context) (logs *Logs, err error
 	logs = initializeJobLogs(LoadSecurityShares)
 	defer func() { recordJobCompletionLogs(logs, err) }()
 
-	securities, err := l.securityServiceClient.GetSecurities(ctx, time.Now())
+	securities, err := l.securityServiceClient.GetSecurities(ctx)
 	if err != nil {
 		return logs, err
 	}

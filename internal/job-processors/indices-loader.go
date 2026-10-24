@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"slices"
 	"strings"
-	"time"
 
 	client "github.com/stratifyr/security-service-client"
 	"github.com/stratifyr/security-service-proto/go/pb"
@@ -40,7 +39,7 @@ func (l *indicesLoader) Process(ctx *gofr.Context) (logs *Logs, err error) {
 	logs = initializeJobLogs(LoadIndices)
 	defer func() { recordJobCompletionLogs(logs, err) }()
 
-	securities, err := l.securityServiceClient.GetSecurities(ctx, time.Now())
+	securities, err := l.securityServiceClient.GetSecurities(ctx)
 	if err != nil {
 		return logs, err
 	}

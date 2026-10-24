@@ -25,7 +25,7 @@ func (l *securityValuesLoader) Process(ctx *gofr.Context) (logs *Logs, err error
 	logs = initializeJobLogs(LoadSecurityValues)
 	defer func() { recordJobCompletionLogs(logs, err) }()
 
-	securities, err := l.securityServiceClient.GetSecurities(ctx, time.Now())
+	securities, err := l.securityServiceClient.GetSecurities(ctx)
 	if err != nil {
 		return logs, err
 	}

@@ -36,7 +36,7 @@ func (s *securityStatsLoader) Process(ctx *gofr.Context) (logs *Logs, err error)
 		return logs, fmt.Errorf("cannot load stats on market holiday %v", today.Format(time.DateOnly))
 	}
 
-	securities, err := s.securityServiceClient.GetSecurities(ctx, time.Now())
+	securities, err := s.securityServiceClient.GetSecurities(ctx)
 	if err != nil {
 		return logs, err
 	}
@@ -74,6 +74,12 @@ func (s *securityStatsLoader) Process(ctx *gofr.Context) (logs *Logs, err error)
 		}
 
 		if err = s.securityServiceClient.UpsertSecurityStat(ctx, payload); err != nil {
+			logs.Errors = append(logs.Errors, fmt.Sprintf("%s %v", symbols[i], err))
+			continue
+		}
+
+		// to warm the cache for backtests
+		if _, err = s.securityServiceClient.GetHistoricalData(ctx, securityIDMap[symbols[i]]); err != nil {
 			logs.Errors = append(logs.Errors, fmt.Sprintf("%s %v", symbols[i], err))
 			continue
 		}

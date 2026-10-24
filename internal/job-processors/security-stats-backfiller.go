@@ -31,7 +31,7 @@ func (s *securityStatsBackfiller) Process(ctx *gofr.Context) (logs *Logs, err er
 	startDate, endDate := fourYearsEarlier, today.AddDate(0, 0, -1)
 	logs.Meta["backfill_period"] = fmt.Sprintf("%s - %s", startDate.Format(time.DateOnly), endDate.Format(time.DateOnly))
 
-	securities, err := s.securityServiceClient.GetSecurities(ctx, time.Now())
+	securities, err := s.securityServiceClient.GetSecurities(ctx)
 	if err != nil {
 		return logs, err
 	}
@@ -105,6 +105,11 @@ func (s *securityStatsBackfiller) Process(ctx *gofr.Context) (logs *Logs, err er
 			}
 		}
 
+		// to warm the cache for backtests
+		if _, err = s.securityServiceClient.GetHistoricalData(ctx, securityIDMap[symbols[i]]); err != nil {
+			logs.Errors = append(logs.Errors, fmt.Sprintf("%s %v", symbols[i], err))
+			continue
+		}
 	}
 
 	return logs, nil
