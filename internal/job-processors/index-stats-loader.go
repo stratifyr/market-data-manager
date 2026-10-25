@@ -36,7 +36,7 @@ func (s *indexStatsLoader) Process(ctx *gofr.Context) (logs *Logs, err error) {
 		return logs, fmt.Errorf("cannot load stats on market holiday %v", today.Format(time.DateOnly))
 	}
 
-	indices, err := s.securityServiceClient.GetIndices(ctx, time.Now())
+	indices, err := s.securityServiceClient.GetIndices(ctx)
 	if err != nil {
 		return logs, err
 	}

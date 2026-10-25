@@ -31,7 +31,7 @@ func (s *indexStatsBackfiller) Process(ctx *gofr.Context) (logs *Logs, err error
 	startDate, endDate := fourYearsEarlier, today.AddDate(0, 0, -1)
 	logs.Meta["backfill_period"] = fmt.Sprintf("%s - %s", startDate.Format(time.DateOnly), endDate.Format(time.DateOnly))
 
-	indices, err := s.securityServiceClient.GetIndices(ctx, time.Now())
+	indices, err := s.securityServiceClient.GetIndices(ctx)
 	if err != nil {
 		return logs, err
 	}

@@ -2,7 +2,6 @@ package jobprocessors
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/stratifyr/security-service-proto/go/pb"
 	"gofr.dev/pkg/gofr"
@@ -25,7 +24,7 @@ func (l *indexValuesLoader) Process(ctx *gofr.Context) (logs *Logs, err error) {
 	logs = initializeJobLogs(LoadIndexValues)
 	defer func() { recordJobCompletionLogs(logs, err) }()
 
-	indices, err := l.securityServiceClient.GetIndices(ctx, time.Now())
+	indices, err := l.securityServiceClient.GetIndices(ctx)
 	if err != nil {
 		return logs, err
 	}
